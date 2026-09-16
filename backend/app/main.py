@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 
+from app.system_monitor import get_system_metrics
+
+
 app = FastAPI(
     title="CyberSentinel",
     description="Cybersecurity Monitoring and Threat Analysis Platform",
@@ -21,3 +24,8 @@ def health_check():
     return {
         "status": "healthy"
     }
+
+
+@app.get("/api/system")
+def system_metrics():
+    return get_system_metrics()
