@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
 from app.system_monitor import get_system_metrics
+from app.process_monitor import get_processes
+
 
 
 app = FastAPI(
@@ -29,3 +31,7 @@ def health_check():
 @app.get("/api/system")
 def system_metrics():
     return get_system_metrics()
+
+@app.get("/api/processes")
+def process_metrics():
+    return get_processes()
