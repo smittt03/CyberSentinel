@@ -6,14 +6,14 @@ from app.network_scanner import scan_network
 from app.log_analyzer import get_recent_logs
 from app.security_checks import run_security_checks
 from app.threat_engine import generate_alerts
-
+from app.database import initialize_database, save_alert
 
 app = FastAPI(
     title="CyberSentinel",
     description="Cybersecurity Monitoring and Threat Analysis Platform",
     version="1.0.0"
 )
-
+initialize_database()
 
 @app.get("/")
 def root():
@@ -60,6 +60,9 @@ def security_checks():
 def security_alerts():
     security_results = run_security_checks()
     alerts = generate_alerts(security_results)
+
+    for alert in alerts:
+        save_alert(alert)
 
     return {
         "alert_count": len(alerts),
