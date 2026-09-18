@@ -5,6 +5,7 @@ from app.process_monitor import get_processes
 from app.network_scanner import scan_network
 from app.log_analyzer import get_recent_logs
 from app.security_checks import run_security_checks
+from app.threat_engine import generate_alerts
 
 
 app = FastAPI(
@@ -53,3 +54,14 @@ def log_metrics(lines: int = 50):
 @app.get("/api/security/checks")
 def security_checks():
     return run_security_checks()
+
+
+@app.get("/api/security/alerts")
+def security_alerts():
+    security_results = run_security_checks()
+    alerts = generate_alerts(security_results)
+
+    return {
+        "alert_count": len(alerts),
+        "alerts": alerts
+    }
