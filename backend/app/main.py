@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 
 from app.system_monitor import get_system_metrics
 from app.process_monitor import get_processes
@@ -6,7 +6,7 @@ from app.network_scanner import scan_network
 from app.log_analyzer import get_recent_logs
 from app.security_checks import run_security_checks
 from app.threat_engine import generate_alerts
-from app.database import initialize_database, save_alert
+from app.database import initialize_database, save_alert, get_alerts
 
 app = FastAPI(
     title="CyberSentinel",
@@ -67,4 +67,10 @@ def security_alerts():
     return {
         "alert_count": len(alerts),
         "alerts": alerts
+    }
+@app.get("/api/alerts")
+def alert_history(limit: int = Query(default=50, ge=1, le=100)):
+    return {
+        "count": len(get_alerts(limit)),
+        "alerts": get_alerts(limit)
     }

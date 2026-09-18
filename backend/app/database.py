@@ -59,3 +59,19 @@ def save_alert(alert):
     connection.close()
 
     return alert_id
+def get_alerts(limit=50):
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT *
+        FROM alerts
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (limit,)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
