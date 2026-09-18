@@ -1,1069 +1,640 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-
-// =========================================================
-// API CONFIGURATION
-// =========================================================
-
 const API_BASE = "http://127.0.0.1:8000";
 
+function formatBytes(bytes) {
+  if (!bytes) return "0 GB";
 
-// =========================================================
-// APP
-// =========================================================
+  const gb = bytes / (1024 ** 3);
 
-function App() {
+  if (gb >= 1) {
+    return `${gb.toFixed(2)} GB`;
+  }
 
-  // -------------------------------------------------------
-  // STATE
-  // -------------------------------------------------------
+  return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
+}
 
+function MetricCard({ title, value, subtitle }) {
+  return (
+    <div className="metric-card">
+      <div className="metric-card-header">
+        <span>{title}</span>
+        <span className="metric-dot">●</span>
+      </div>
+
+      <div className="metric-value">{value}</div>
+      <div className="metric-subtitle">{subtitle}</div>
+    </div>
+  );
+}
+
+function UsageBar({ label, percentage }) {
+  const safePercentage = Math.min(Math.max(percentage || 0, 0), 100);
+
+  return (
+    <div className="usage-section">
+      <div className="usage-header">
+        <span>{label}</span>
+        <span>{safePercentage.toFixed(1)}%</span>
+      </div>
+
+      <div className="usage-track">
+        <div
+          className="usage-fill"
+          style={{ width: `${safePercentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SystemMonitor() {
   const [system, setSystem] = useState(null);
-  const [alerts, setAlerts] = useState([]);
-  const [alertHistory, setAlertHistory] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
-  const [backendOnline, setBackendOnline] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [lastUpdated, setLastUpdated] = useState(null);
-
-
-  // -------------------------------------------------------
-  // FETCH SYSTEM METRICS
-  // -------------------------------------------------------
-
-  const fetchSystemData = async () => {
-
+  async function fetchSystemMetrics() {
     try {
-
-      const response = await fetch(
-        `${API_BASE}/api/system`
-      );
+      const response = await fetch(`${API_BASE}/api/system`);
 
       if (!response.ok) {
-        throw new Error("System API request failed");
+        throw new Error("Backend request failed");
       }
 
       const data = await response.json();
 
       setSystem(data);
-      setBackendOnline(true);
-
+      setConnected(true);
+      setLastUpdate(new Date());
     } catch (error) {
-
-      console.error(
-        "System API error:",
-        error
-      );
-
-      setBackendOnline(false);
+      console.error("System monitor error:", error);
+      setConnected(false);
     }
-  };
-
-
-  // -------------------------------------------------------
-  // FETCH ACTIVE SECURITY ALERTS
-  // -------------------------------------------------------
-
-  const fetchSecurityAlerts = async () => {
-
-    try {
-
-      const response = await fetch(
-        `${API_BASE}/api/security/alerts`
-      );
-
-      if (!response.ok) {
-        throw new Error("Security alert API request failed");
-      }
-
-      const data = await response.json();
-
-      setAlerts(
-        data.alerts || []
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Security alert API error:",
-        error
-      );
-    }
-  };
-
-
-  // -------------------------------------------------------
-  // FETCH ALERT HISTORY
-  // -------------------------------------------------------
-
-  const fetchAlertHistory = async () => {
-
-    try {
-
-      const response = await fetch(
-        `${API_BASE}/api/alerts?limit=10`
-      );
-
-      if (!response.ok) {
-        throw new Error("Alert history API request failed");
-      }
-
-      const data = await response.json();
-
-      setAlertHistory(
-        data.alerts || []
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Alert history API error:",
-        error
-      );
-    }
-  };
-
-
-  // -------------------------------------------------------
-  // REFRESH DASHBOARD
-  // -------------------------------------------------------
-
-  const refreshDashboard = async () => {
-
-    setLoading(true);
-
-    await Promise.all([
-      fetchSystemData(),
-      fetchSecurityAlerts(),
-      fetchAlertHistory()
-    ]);
-
-    setLastUpdated(
-      new Date()
-    );
-
-    setLoading(false);
-  };
-
-
-  // -------------------------------------------------------
-  // INITIAL LOAD + AUTOMATIC REFRESH
-  // -------------------------------------------------------
+  }
 
   useEffect(() => {
+    fetchSystemMetrics();
 
-    refreshDashboard();
+    const interval = setInterval(fetchSystemMetrics, 5000);
 
-    const interval = setInterval(() => {
-
-      fetchSystemData();
-      fetchSecurityAlerts();
-      fetchAlertHistory();
-
-      setLastUpdated(
-        new Date()
-      );
-
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-
+    return () => clearInterval(interval);
   }, []);
 
-
-  // =======================================================
-  // DATA HELPERS
-  // =======================================================
-
-  const cpuUsage =
-    system?.cpu?.usage_percent ?? null;
-
-  const memoryUsage =
-    system?.memory?.usage_percent ?? null;
-
-  const diskUsage =
-    system?.disk?.usage_percent ?? null;
-
-
-  const formatPercent = (value) => {
-
-    if (
-      value === null ||
-      value === undefined
-    ) {
-      return "--";
-    }
-
-    return Number(value).toFixed(1);
-  };
-
-
-  const formatBytes = (bytes) => {
-
-    if (
-      bytes === null ||
-      bytes === undefined
-    ) {
-      return "--";
-    }
-
-    const units = [
-      "B",
-      "KB",
-      "MB",
-      "GB",
-      "TB"
-    ];
-
-    let value = bytes;
-    let index = 0;
-
-    while (
-      value >= 1024 &&
-      index < units.length - 1
-    ) {
-
-      value /= 1024;
-      index++;
-
-    }
-
-    return `${value.toFixed(1)} ${units[index]}`;
-  };
-
-
-  const formatTime = (timestamp) => {
-
-    if (!timestamp) {
-      return "NOW";
-    }
-
-    const date = new Date(
-      timestamp
-    );
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return "NOW";
-    }
-
-    return date.toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit"
-      }
-    );
-  };
-
-
-  // =======================================================
-  // ALERT HELPERS
-  // =======================================================
-
-  const activeAlertCount =
-    alerts.filter(
-      (alert) =>
-        alert.status === "active"
-    ).length;
-
-
-  const resolvedAlertCount =
-    alertHistory.filter(
-      (alert) =>
-        alert.status === "resolved"
-    ).length;
-
-
-  const currentAlert =
-    alerts.length > 0
-      ? alerts[0]
-      : null;
-
-
-  // =======================================================
-  // RENDER
-  // =======================================================
-
   return (
-
-    <div className="app">
-
-
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
-
-      <aside className="sidebar">
-
-        <div className="brand">
-
-          <div className="brand-icon">
-            ◇
-          </div>
-
-          <div>
-
-            <h2>
-              CyberSentinel
-            </h2>
-
-            <span>
-              Security Console
-            </span>
-
-          </div>
-
+    <>
+      <section className="page-heading">
+        <div>
+          <p className="section-label">MODULE / 01</p>
+          <h1>SYSTEM MONITOR</h1>
+          <p className="page-description">
+            Real-time visibility into host resource utilization.
+          </p>
         </div>
 
-
-        <nav>
-
-          <div className="nav-item active">
-            ◈ Dashboard
-          </div>
-
-          <div className="nav-item">
-            ◉ System Monitor
-          </div>
-
-          <div className="nav-item">
-            ⌁ Network
-          </div>
-
-          <div className="nav-item">
-            △ Threats
-          </div>
-
-          <div className="nav-item">
-            ▤ Logs
-          </div>
-
-          <div className="nav-item">
-            ⚙ Security Checks
-          </div>
-
-        </nav>
-
-
-        <div className="sidebar-bottom">
-
-          <div className="connection">
-
-            <span className="pulse"></span>
-
-            {backendOnline
-              ? "Backend Connected"
-              : "Backend Offline"}
-
-          </div>
-
-          <small>
-            CyberSentinel v1.0
-          </small>
-
+        <div className="live-indicator">
+          <span className="pulse-dot" />
+          LIVE MONITORING
         </div>
+      </section>
 
-      </aside>
-
-
-      {/* =================================================
-          MAIN
-      ================================================= */}
-
-      <main className="main">
-
-
-        {/* =================================================
-            TOP BAR
-        ================================================= */}
-
-        <header className="topbar">
-
-          <div>
-
-            <div className="eyebrow">
-              SECURITY OPERATIONS CENTER
-            </div>
-
-            <h1>
-              Dashboard
-            </h1>
-
-            <p>
-              Real-time visibility into your Linux environment.
-            </p>
-
+      {!system ? (
+        <div className="loading-panel">
+          <div className="loading-text">
+            INITIALIZING SYSTEM TELEMETRY...
           </div>
+        </div>
+      ) : (
+        <>
+          <section className="metrics-grid">
+            <MetricCard
+              title="CPU USAGE"
+              value={`${system.cpu.usage_percent.toFixed(1)}%`}
+              subtitle={`${system.cpu.logical_cores} logical cores`}
+            />
 
+            <MetricCard
+              title="MEMORY USAGE"
+              value={`${system.memory.usage_percent.toFixed(1)}%`}
+              subtitle={`${formatBytes(system.memory.available_bytes)} available`}
+            />
 
-          <div className="top-actions">
+            <MetricCard
+              title="DISK USAGE"
+              value={`${system.disk.usage_percent.toFixed(1)}%`}
+              subtitle={`${formatBytes(system.disk.free_bytes)} free`}
+            />
+          </section>
 
-            <div className="live">
+          <section className="monitor-grid">
+            <div className="panel">
+              <div className="panel-heading">
+                <span>RESOURCE UTILIZATION</span>
+                <span className="panel-tag">LIVE</span>
+              </div>
 
-              <span></span>
-
-              {backendOnline
-                ? "LIVE MONITORING"
-                : "BACKEND OFFLINE"}
-
-            </div>
-
-
-            <div className="avatar">
-              SP
-            </div>
-
-          </div>
-
-        </header>
-
-
-        {/* =================================================
-            STAT CARDS
-        ================================================= */}
-
-        <section className="stats">
-
-
-          {/* CPU */}
-
-          <div className="stat-card cyan">
-
-            <div className="stat-header">
-
-              <span>
-                CPU LOAD
-              </span>
-
-              <span className="stat-icon">
-                ◉
-              </span>
-
-            </div>
-
-
-            <div className="stat-value">
-
-              {formatPercent(cpuUsage)}
-
-              <small>
-                %
-              </small>
-
-            </div>
-
-
-            <div className="progress">
-
-              <div
-                style={{
-                  width:
-                    cpuUsage !== null
-                      ? `${Math.min(
-                          Math.max(cpuUsage, 0),
-                          100
-                        )}%`
-                      : "0%"
-                }}
+              <UsageBar
+                label="CPU"
+                percentage={system.cpu.usage_percent}
               />
 
-            </div>
-
-
-            <p>
-              System processor utilization
-            </p>
-
-          </div>
-
-
-          {/* MEMORY */}
-
-          <div className="stat-card purple">
-
-            <div className="stat-header">
-
-              <span>
-                MEMORY
-              </span>
-
-              <span className="stat-icon">
-                ▣
-              </span>
-
-            </div>
-
-
-            <div className="stat-value">
-
-              {formatPercent(memoryUsage)}
-
-              <small>
-                %
-              </small>
-
-            </div>
-
-
-            <div className="progress">
-
-              <div
-                style={{
-                  width:
-                    memoryUsage !== null
-                      ? `${Math.min(
-                          Math.max(memoryUsage, 0),
-                          100
-                        )}%`
-                      : "0%"
-                }}
+              <UsageBar
+                label="MEMORY"
+                percentage={system.memory.usage_percent}
               />
 
-            </div>
-
-
-            <p>
-              RAM utilization
-            </p>
-
-          </div>
-
-
-          {/* DISK */}
-
-          <div className="stat-card orange">
-
-            <div className="stat-header">
-
-              <span>
-                DISK
-              </span>
-
-              <span className="stat-icon">
-                ◫
-              </span>
-
-            </div>
-
-
-            <div className="stat-value">
-
-              {formatPercent(diskUsage)}
-
-              <small>
-                %
-              </small>
-
-            </div>
-
-
-            <div className="progress">
-
-              <div
-                style={{
-                  width:
-                    diskUsage !== null
-                      ? `${Math.min(
-                          Math.max(diskUsage, 0),
-                          100
-                        )}%`
-                      : "0%"
-                }}
+              <UsageBar
+                label="DISK"
+                percentage={system.disk.usage_percent}
               />
-
             </div>
 
+            <div className="panel">
+              <div className="panel-heading">
+                <span>HOST INFORMATION</span>
+                <span className="panel-tag">TELEMETRY</span>
+              </div>
 
-            <p>
-              Root filesystem usage
-            </p>
+              <div className="info-row">
+                <span>Logical Cores</span>
+                <strong>{system.cpu.logical_cores}</strong>
+              </div>
 
-          </div>
+              <div className="info-row">
+                <span>Physical Cores</span>
+                <strong>{system.cpu.physical_cores}</strong>
+              </div>
 
+              <div className="info-row">
+                <span>Total Memory</span>
+                <strong>{formatBytes(system.memory.total_bytes)}</strong>
+              </div>
 
-          {/* ACTIVE THREATS */}
+              <div className="info-row">
+                <span>Used Memory</span>
+                <strong>{formatBytes(system.memory.used_bytes)}</strong>
+              </div>
 
-          <div className="stat-card red">
+              <div className="info-row">
+                <span>Total Disk</span>
+                <strong>{formatBytes(system.disk.total_bytes)}</strong>
+              </div>
 
-            <div className="stat-header">
+              <div className="info-row">
+                <span>Free Disk</span>
+                <strong>{formatBytes(system.disk.free_bytes)}</strong>
+              </div>
+            </div>
+          </section>
 
-              <span>
-                THREATS
+          <section className="footer-status">
+            <div>
+              <span className="status-key">TELEMETRY SOURCE</span>
+              <span className="status-value">psutil / Linux host</span>
+            </div>
+
+            <div>
+              <span className="status-key">REFRESH</span>
+              <span className="status-value">5 seconds</span>
+            </div>
+
+            <div>
+              <span className="status-key">LAST UPDATE</span>
+              <span className="status-value">
+                {lastUpdate
+                  ? lastUpdate.toLocaleTimeString()
+                  : "Waiting..."}
               </span>
-
-              <span className="stat-icon">
-                △
-              </span>
-
             </div>
-
-
-            <div className="stat-value">
-
-              {loading
-                ? "--"
-                : activeAlertCount
-                    .toString()
-                    .padStart(2, "0")}
-
-            </div>
-
-
-            <div className="threat-status">
-
-              {activeAlertCount > 0
-                ? "ACTIVE ALERT"
-                : "SYSTEM CLEAR"}
-
-            </div>
-
-
-            <p>
-              Active security events
-            </p>
-
-          </div>
-
-        </section>
-
-
-        {/* =================================================
-            MAIN CONTENT
-        ================================================= */}
-
-        <section className="content-grid">
-
-
-          {/* =================================================
-              THREAT INTELLIGENCE
-          ================================================= */}
-
-          <div className="panel">
-
-            <div className="panel-title">
-
-              <div>
-
-                <div className="eyebrow">
-                  THREAT INTELLIGENCE
-                </div>
-
-                <h2>
-                  Security Overview
-                </h2>
-
-              </div>
-
-
-              <button
-                onClick={refreshDashboard}
-              >
-                REFRESH ↻
-              </button>
-
-            </div>
-
-
-            {/* CURRENT ALERT */}
-
-            <div className="threat-banner">
-
-              <div className="threat-ring">
-                {currentAlert
-                  ? "!"
-                  : "✓"}
-              </div>
-
-
-              <div>
-
-                <span>
-
-                  {currentAlert
-                    ? "ATTENTION REQUIRED"
-                    : "SYSTEM CLEAR"}
-
-                </span>
-
-
-                <h3>
-
-                  {currentAlert
-                    ? currentAlert.message
-                    : "No active security alerts"}
-
-                </h3>
-
-
-                <p>
-
-                  {currentAlert
-
-                    ? `CyberSentinel detected an active ${currentAlert.type} event from ${currentAlert.source}.`
-
-                    : "CyberSentinel has not detected any current security events."}
-
-                </p>
-
-              </div>
-
-
-              <div className="severity">
-
-                {currentAlert
-                  ? currentAlert.severity.toUpperCase()
-                  : "CLEAR"}
-
-              </div>
-
-            </div>
-
-
-            {/* =================================================
-                SYSTEM ACTIVITY
-            ================================================= */}
-
-            <div className="activity">
-
-              <div className="activity-title">
-                SYSTEM ACTIVITY
-              </div>
-
-
-              {alertHistory.length === 0 ? (
-
-                <div className="activity-row">
-
-                  <div className="activity-dot"></div>
-
-                  <div>
-
-                    <strong>
-                      No alert history
-                    </strong>
-
-                    <p>
-                      CyberSentinel has not stored any security events yet.
-                    </p>
-
-                  </div>
-
-                  <time>
-                    NOW
-                  </time>
-
-                </div>
-
-              ) : (
-
-                alertHistory
-                  .slice(0, 4)
-                  .map(
-                    (alert, index) => (
-
-                      <div
-                        className="activity-row"
-                        key={alert.id || index}
-                      >
-
-                        <div
-                          className={
-                            `activity-dot ${
-                              index % 3 === 1
-                                ? "cyan-dot"
-                                : index % 3 === 2
-                                ? "purple-dot"
-                                : ""
-                            }`
-                          }
-                        ></div>
-
-
-                        <div>
-
-                          <strong>
-                            {alert.message}
-                          </strong>
-
-                          <p>
-
-                            {alert.type}
-                            {" · "}
-                            {alert.source}
-                            {" · "}
-                            {alert.status?.toUpperCase()}
-
-                          </p>
-
-                        </div>
-
-
-                        <time>
-                          {formatTime(
-                            alert.created_at
-                          )}
-                        </time>
-
-                      </div>
-
-                    )
-                  )
-
-              )}
-
-            </div>
-
-          </div>
-
-
-          {/* =================================================
-              SYSTEM HEALTH
-          ================================================= */}
-
-          <div className="panel">
-
-            <div className="panel-title">
-
-              <div>
-
-                <div className="eyebrow">
-                  SYSTEM
-                </div>
-
-                <h2>
-                  Health
-                </h2>
-
-              </div>
-
-
-              <div className="healthy">
-
-                <span>
-                  ●
-                </span>{" "}
-
-                {backendOnline
-                  ? "HEALTHY"
-                  : "OFFLINE"}
-
-              </div>
-
-            </div>
-
-
-            <div className="health-item">
-
-              <span>
-                API Server
-              </span>
-
-              <strong>
-                {backendOnline
-                  ? "ONLINE"
-                  : "OFFLINE"}
-              </strong>
-
-            </div>
-
-
-            <div className="health-item">
-
-              <span>
-                Database
-              </span>
-
-              <strong>
-                {backendOnline
-                  ? "ONLINE"
-                  : "UNKNOWN"}
-              </strong>
-
-            </div>
-
-
-            <div className="health-item">
-
-              <span>
-                Threat Engine
-              </span>
-
-              <strong>
-                ACTIVE
-              </strong>
-
-            </div>
-
-
-            <div className="health-item">
-
-              <span>
-                Security Checks
-              </span>
-
-              <strong>
-                ACTIVE
-              </strong>
-
-            </div>
-
-
-            <div className="health-score">
-
-              <div className="score">
-
-                {backendOnline
-                  ? "100"
-                  : "00"}
-
-              </div>
-
-
-              <div>
-
-                <strong>
-                  Platform Status
-                </strong>
-
-                <p>
-
-                  {backendOnline
-                    ? "All core services responding"
-                    : "Unable to reach FastAPI backend"}
-
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* =================================================
-            BOTTOM INFORMATION
-        ================================================= */}
-
-        <section className="bottom-grid">
-
-
-          {/* MEMORY AVAILABLE */}
-
-          <div className="mini-panel">
-
-            <span>
-              MEMORY AVAILABLE
-            </span>
-
-            <strong>
-
-              {system
-                ? formatBytes(
-                    system.memory.available_bytes
-                  )
-                : "--"}
-
-            </strong>
-
-            <p>
-              Available system memory
-            </p>
-
-          </div>
-
-
-          {/* DISK FREE */}
-
-          <div className="mini-panel">
-
-            <span>
-              DISK FREE
-            </span>
-
-            <strong>
-
-              {system
-                ? formatBytes(
-                    system.disk.free_bytes
-                  )
-                : "--"}
-
-            </strong>
-
-            <p>
-              Available root filesystem space
-            </p>
-
-          </div>
-
-
-          {/* ALERT HISTORY */}
-
-          <div className="mini-panel">
-
-            <span>
-              RESOLVED EVENTS
-            </span>
-
-            <strong>
-              {resolvedAlertCount}
-            </strong>
-
-            <p>
-              Historical resolved security events
-            </p>
-
-          </div>
-
-
-          {/* LAST UPDATE */}
-
-          <div className="mini-panel">
-
-            <span>
-              LAST UPDATE
-            </span>
-
-            <strong>
-
-              {lastUpdated
-                ? lastUpdated.toLocaleTimeString(
-                    [],
-                    {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit"
-                    }
-                  )
-                : "--:--:--"}
-
-            </strong>
-
-            <p>
-              Dashboard refresh interval: 5 sec
-            </p>
-
-          </div>
-
-        </section>
-
-
-      </main>
-
-    </div>
-
+          </section>
+        </>
+      )}
+    </>
   );
 }
 
+function NetworkDashboard() {
+  const [target, setTarget] = useState("127.0.0.1");
+  const [result, setResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState("");
+
+  async function runNetworkScan(event) {
+    event.preventDefault();
+
+    if (!target.trim()) {
+      setError("Please enter a target.");
+      return;
+    }
+
+    setScanning(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/network/scan?target=${encodeURIComponent(
+          target.trim()
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Network scan request failed");
+      }
+
+      const data = await response.json();
+
+      setResult(data);
+    } catch (scanError) {
+      console.error("Network scan error:", scanError);
+      setError(
+        "Unable to complete the network scan. Check that the backend is running."
+      );
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <p className="section-label">MODULE / 02</p>
+
+          <h1>NETWORK DISCOVERY</h1>
+
+          <p className="page-description">
+            Discover hosts and exposed services on authorized networks.
+          </p>
+        </div>
+
+        <div className="live-indicator">
+          <span className="pulse-dot" />
+          NMAP ENGINE
+        </div>
+      </section>
+
+      <section className="scan-panel">
+        <div className="panel-heading">
+          <span>NETWORK SCAN</span>
+          <span className="panel-tag">AUTHORIZED TARGETS ONLY</span>
+        </div>
+
+        <form className="scan-form" onSubmit={runNetworkScan}>
+          <div className="target-field">
+            <label htmlFor="network-target">
+              TARGET
+            </label>
+
+            <input
+              id="network-target"
+              type="text"
+              value={target}
+              onChange={(event) => setTarget(event.target.value)}
+              placeholder="127.0.0.1"
+              disabled={scanning}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="scan-button"
+            disabled={scanning}
+          >
+            {scanning ? "SCANNING..." : "START SCAN"}
+          </button>
+        </form>
+
+        <div className="scan-warning">
+          Only scan systems and networks you are authorized to assess.
+        </div>
+      </section>
+
+      {error && (
+        <div className="error-panel">
+          <span>⚠</span>
+          {error}
+        </div>
+      )}
+
+      {scanning && (
+        <div className="loading-panel">
+          <div className="loading-text">
+            NMAP DISCOVERY IN PROGRESS...
+          </div>
+        </div>
+      )}
+
+      {result && !scanning && (
+        <>
+          <section className="network-summary">
+            <MetricCard
+              title="TARGET"
+              value={result.target}
+              subtitle="Scanned target"
+            />
+
+            <MetricCard
+              title="HOST STATUS"
+              value={result.host_up ? "UP" : "DOWN"}
+              subtitle={
+                result.host_up
+                  ? "Host responded to discovery"
+                  : "Host did not respond"
+              }
+            />
+
+            <MetricCard
+              title="OPEN PORTS"
+              value={result.ports.length}
+              subtitle="TCP services detected"
+            />
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <span>DISCOVERED SERVICES</span>
+              <span className="panel-tag">
+                {result.ports.length} RESULT
+                {result.ports.length === 1 ? "" : "S"}
+              </span>
+            </div>
+
+            {result.ports.length === 0 ? (
+              <div className="empty-state">
+                No open ports were detected on the target.
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="network-table">
+                  <thead>
+                    <tr>
+                      <th>PORT</th>
+                      <th>PROTOCOL</th>
+                      <th>STATE</th>
+                      <th>SERVICE</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {result.ports.map((port) => (
+                      <tr
+                        key={`${port.port}-${port.protocol}`}
+                      >
+                        <td className="port-number">
+                          {port.port}
+                        </td>
+
+                        <td>
+                          {port.protocol.toUpperCase()}
+                        </td>
+
+                        <td>
+                          <span className="port-status">
+                            ● {port.state.toUpperCase()}
+                          </span>
+                        </td>
+
+                        <td>
+                          {port.service || "unknown"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="network-footer">
+            <span>
+              NMAP RETURN CODE: {result.return_code}
+            </span>
+
+            <span>
+              TARGET: {result.target}
+            </span>
+          </section>
+        </>
+      )}
+    </>
+  );
+}
+
+function PlaceholderPage({ module, title, description }) {
+  return (
+    <section className="placeholder-page">
+      <p className="section-label">{module}</p>
+
+      <h1>{title}</h1>
+
+      <p className="page-description">{description}</p>
+
+      <div className="placeholder-panel">
+        <div className="placeholder-icon">◈</div>
+
+        <div className="placeholder-title">
+          MODULE INITIALIZATION
+        </div>
+
+        <div className="placeholder-text">
+          This security module is part of the CyberSentinel architecture
+          and will be connected to its backend telemetry pipeline next.
+        </div>
+
+        <div className="placeholder-status">
+          STATUS: STANDBY
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function App() {
+  const [activePage, setActivePage] = useState("system");
+  const [backendOnline, setBackendOnline] = useState(false);
+
+  useEffect(() => {
+    async function checkBackend() {
+      try {
+        const response = await fetch(`${API_BASE}/health`);
+        setBackendOnline(response.ok);
+      } catch {
+        setBackendOnline(false);
+      }
+    }
+
+    checkBackend();
+
+    const interval = setInterval(checkBackend, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const navigation = [
+    {
+      id: "overview",
+      label: "OVERVIEW",
+      module: "CORE",
+    },
+    {
+      id: "system",
+      label: "SYSTEM",
+      module: "MODULE / 01",
+    },
+    {
+      id: "network",
+      label: "NETWORK",
+      module: "MODULE / 02",
+    },
+    {
+      id: "threats",
+      label: "THREATS",
+      module: "MODULE / 03",
+    },
+    {
+      id: "logs",
+      label: "LOGS",
+      module: "MODULE / 04",
+    },
+    {
+      id: "security",
+      label: "SECURITY",
+      module: "MODULE / 05",
+    },
+  ];
+
+  function renderPage() {
+    switch (activePage) {
+      case "system":
+        return <SystemMonitor />;
+
+      case "overview":
+        return (
+          <PlaceholderPage
+            module="CORE / DASHBOARD"
+            title="SECURITY OVERVIEW"
+            description="Centralized view of CyberSentinel security telemetry."
+          />
+        );
+
+      case "network":
+  return <NetworkDashboard />;
+
+      case "threats":
+        return (
+          <PlaceholderPage
+            module="MODULE / 03"
+            title="THREAT CENTER"
+            description="Monitor active threats and security alerts."
+          />
+        );
+
+      case "logs":
+        return (
+          <PlaceholderPage
+            module="MODULE / 04"
+            title="LOG ANALYZER"
+            description="Inspect system logs and suspicious events."
+          />
+        );
+
+      case "security":
+        return (
+          <PlaceholderPage
+            module="MODULE / 05"
+            title="SECURITY CHECKS"
+            description="Review host security posture and detected conditions."
+          />
+        );
+
+      default:
+        return <SystemMonitor />;
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <div className="brand">CYBERSENTINEL</div>
+
+          <div className="brand-subtitle">
+            SECURITY MONITORING & THREAT ANALYSIS PLATFORM
+          </div>
+        </div>
+
+        <div className="connection-status">
+          <span
+            className={
+              backendOnline
+                ? "status-dot online"
+                : "status-dot offline"
+            }
+          />
+
+          {backendOnline
+            ? "BACKEND CONNECTED"
+            : "BACKEND OFFLINE"}
+        </div>
+      </header>
+
+      <div className="workspace">
+        <aside className="sidebar">
+          <div className="sidebar-title">
+            SECURITY CONSOLE
+          </div>
+
+          <nav>
+            {navigation.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${
+                  activePage === item.id ? "active" : ""
+                }`}
+                onClick={() => setActivePage(item.id)}
+              >
+                <span className="nav-indicator">
+                  {activePage === item.id ? "●" : "○"}
+                </span>
+
+                <span>
+                  <span className="nav-label">
+                    {item.label}
+                  </span>
+
+                  <span className="nav-module">
+                    {item.module}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="engine-status">
+              <span className="status-dot online" />
+              THREAT ENGINE
+            </div>
+
+            <div className="engine-status">
+              <span className="status-dot online" />
+              DATABASE
+            </div>
+
+            <div className="engine-status">
+              <span className="status-dot online" />
+              API SERVER
+            </div>
+          </div>
+        </aside>
+
+        <main className="main-content">
+          {renderPage()}
+        </main>
+      </div>
+    </div>
+  );
+}
 
 export default App;
