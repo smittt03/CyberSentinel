@@ -4,6 +4,7 @@ from app.system_monitor import get_system_metrics
 from app.process_monitor import get_processes
 from app.network_scanner import scan_network
 from app.log_analyzer import get_recent_logs
+from app.security_checks import run_security_checks
 
 
 app = FastAPI(
@@ -47,3 +48,8 @@ def network_scan(target: str):
 @app.get("/api/logs")
 def log_metrics(lines: int = 50):
     return get_recent_logs(lines)
+
+
+@app.get("/api/security/checks")
+def security_checks():
+    return run_security_checks()
