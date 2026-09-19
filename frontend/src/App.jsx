@@ -619,34 +619,25 @@ function ProcessMonitor() {
       clearInterval(interval);
   }, []);
 
-  const statistics = useMemo(() => {
-    const total = processes.length;
+  
+const statistics = useMemo(() => {
+  const total = processes.length;
 
-    const active = processes.filter(
-      (process) =>
-        ![
-          "sleeping",
-          "idle",
-          "stopped",
-          "zombie",
-        ].includes(
-          String(
-            process.status
-          ).toLowerCase()
-        )
-    ).length;
+  const active = processes.filter(
+    (process) => process.is_active
+  ).length;
 
-    const highCpu = processes.filter(
-      (process) =>
-        Number(process.cpu_percent) >= 5
-    ).length;
+  const highCpu = processes.filter(
+    (process) => process.high_cpu
+  ).length;
 
-    return {
-      total,
-      active,
-      highCpu,
-    };
-  }, [processes]);
+  return {
+    total,
+    active,
+    highCpu,
+  };
+}, [processes]);
+
 
   const sortedProcesses = useMemo(() => {
     return [...processes]
