@@ -979,8 +979,9 @@ function LogAnalyzer() {
       clearInterval(interval);
   }, [lines]);
 
-  const events =
-    logData?.events || [];
+  const events = Array.isArray(logData?.events)
+    ? logData.events
+    : [];
 
   const flaggedEvents =
     events.filter(
@@ -1277,8 +1278,9 @@ function SecurityChecks() {
       clearInterval(interval);
   }, []);
 
-  const checks =
-    securityData?.checks || [];
+  const checks = Array.isArray(securityData?.checks)
+    ? securityData.checks
+    : [];
 
   const passedChecks =
     checks.filter(
